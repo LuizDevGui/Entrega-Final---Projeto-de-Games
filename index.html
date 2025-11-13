@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Corrida do Entregador — Versão Final</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:#000;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    height:100vh;
+    overflow:hidden;
+    font-family:Arial,Helvetica,sans-serif;
+  }
+
+  .game{
+    position:relative;
+    width:800px;
+    height:300px;
+    border:3px solid #111;
+    border-radius:10px;
+    overflow:hidden;
+  }
+
+  .bgLayer{
+    position:absolute;
+    inset:0;
+    background-repeat:repeat-x;
+    background-position:bottom;
+    background-size:cover;
+    transition:opacity 1s ease-in-out;
+    will-change:opacity;
+    opacity:0;
+    z-index:0;
+  }
+  .bgLayer.visible{opacity:1}
+
+  .car{
+    position:absolute;
+    bottom:0;
+    left:220px;
+    width:200px;
+    height:100px;
+    background:url('img/e2.gif') center/contain no-repeat;
+    z-index:5;
+    pointer-events:none;
+    transition: transform 1.2s ease-in-out, opacity 1s ease-in-out;
+  }
+
+  .car.exit{
+    transform: translateX(400px);
+    opacity: 0;
+  }
+
+  .obstacle{
+    position:absolute;
+    bottom:0;
+    width:60px;
+    height:50px;
+    background:url('img/cone.webp') center/contain no-repeat;
+    z-index:3;
+  }
+
+  .coin{
+    position:absolute;
+    bottom:60px;
+    width:40px;
+    height:40px;
+    background:url('img/coin.webp') center/contain no-repeat;
+    z-index:3;
+    animation:spin 1s linear infinite;
+  }
+  @keyframes spin{
+    from{transform:rotateY(0deg)}
+    to{transform:rotateY(360deg)}
+  }
+
+  .policial{
+    position:absolute;
+    bottom:0;
+    left:60px;
+    width:200px;
+    height:100px;
+    background:url('img/policia.gif') center/contain no-repeat;
+    z-index:4;
+    opacity:0;
+    transition:opacity .4s ease-in-out;
+  }
+
+  .hud{
+    position:absolute;
+    top:10px;
+    left:10px;
+    color:#fff;
+    font-weight:700;
+    font-size:18px;
+    text-shadow:0 2px 6px rgba(0,0,0,.8);
+    z-index:10;
+    display:flex;
+    gap:30px;
+  }
+
+  .progress-container{
+    position:absolute;
+    top:40px;
+    left:10px;
+    width:780px;
+    height:10px;
+    background:rgba(255,255,255,.18);
+    border-radius:5px;
+    overflow:hidden;
+    z-index:10;
+  }
+  .progress-bar{
+    width:0;
+    height:100%;
+    background:linear-gradient(90deg,#00ffcc,#00ff66);
+    transition:width .3s linear;
+  }
+
+  .overlay{
+    position:absolute;
+    inset:0;
+    background:rgba(0,0,0,.85);
+    color:#fff;
+    font-size:28px;
+    font-weight:700;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    z-index:50;
+  }
+  .hidden{display:none}
+
+  .restart-btn,.start-btn,.revive-btn{
+    margin-top:14px;
+    padding:10px 20px;
+    border-radius:8px;
+    border:0;
+    background:#00ff99;
+    color:#000;
+    font-weight:700;
+    cursor:pointer;
+  }
+
+  .reward{
+    position:absolute;
+    left:50%;
+    top:40%;
+    transform:translate(-50%,-50%);
+    font-size:30px;
+    color:gold;
+    text-shadow:0 0 12px #ffb;
+    z-index:21;
+    animation:rewardPop 1.6s ease-out forwards;
+  }
+  @keyframes rewardPop{
+    0%{transform:translate(-50%,-50%) scale(.2);opacity:0}
+    40%{transform:translate(-50%,-50%) scale(1.2);opacity:1}
+    100%{transform:translate(-50%,-50%) scale(1);opacity:0}
+  }
+
+  .distance{
+    position:absolute;
+    top:60px;
+    left:10px;
+    color:#fff;
+    font-size:16px;
+    font-weight:700;
+    z-index:10;
+  }
+  /* 🎚️ Botão de controle de música */
+#toggle-music {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: #00ff99;
+  color: #000;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 700;
+  z-index: 60; /* acima de tudo */
+  transition: background 0.3s ease;
+}
+
+#toggle-music:hover {
+  background: #00cc77;
+}
+</style>
+</head>
+<body>
+  <div class="game" id="game"><audio id="bg-music" src="sounds/musicfundo.mp3" loop></audio><button id="toggle-music">🔊 Música</button>
+    <div id="bgA" class="bgLayer visible" style="background-image:url('img/fundo.avif')"></div>
+    <div id="bgB" class="bgLayer" style="background-image:url('img/fundo-2.jpg')"></div>
+
+    <div class="hud">
+      <div id="score">SCORE: 0 | NÍVEL: 1</div>
+      <div id="coins">💰 MOEDAS: 0</div>
+      <div id="distance" class="distance">📦 DISTÂNCIA: 500m</div>
+    </div>
+
+    <div class="progress-container">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <div class="car" id="car"></div>
+    <div class="policial" id="policial"></div>
+
+    <div class="overlay" id="startScreen">
+      🚴‍♂️ <br> Corrida do Entregador <br>
+      <button class="start-btn" id="startBtn">Iniciar</button>
+    </div>
+
+    <div class="overlay hidden" id="gameOver">
+      💥 GAME OVER 💥
+      <button class="revive-btn" id="reviveBtn">❤️ Reviver (-5 moedas)</button>
+      <button class="restart-btn" id="restartBtn">🔁 Reiniciar</button>
+    </div>
+
+    <div class="overlay hidden" id="victoryScreen">
+      🏆 Parabéns! Você zerou o game! 🏆
+      <button class="restart-btn" id="restartBtn2">Jogar Novamente</button>
+    </div>
+  </div>
+
+<script>
+const game=document.getElementById('game');
+const car=document.getElementById('car');
+const policial=document.getElementById('policial');
+const scoreEl=document.getElementById('score');
+const coinsEl=document.getElementById('coins');
+const distanceEl=document.getElementById('distance');
+const progressBar=document.getElementById('progressBar');
+const gameOver=document.getElementById('gameOver');
+const restartBtn=document.getElementById('restartBtn');
+const restartBtn2=document.getElementById('restartBtn2');
+const startScreen=document.getElementById('startScreen');
+const startBtn=document.getElementById('startBtn');
+const victoryScreen=document.getElementById('victoryScreen');
+const reviveBtn=document.getElementById('reviveBtn');
+const bgA=document.getElementById('bgA');
+const bgB=document.getElementById('bgB');
+
+let carY=0,velocityY=0,isJumping=false;
+const jumpForce=14,gravity=-0.8;
+let policeY=0,policeVelY=0,policeJumping=false;
+let gameSpeed=7;
+const SPEED_INCREMENT=1.5;
+let backgroundX=0;
+let score=0,level=1,coins=0;
+let distance=300;
+let obstacles=[],coinsArr=[];
+let isGameOver=false,progress=0,policeActive=false,policeX=60;
+let bgIndex=0,isTransitioning=false;
+const bgList=["img/fundo.avif","img/fundo-2.jpg","img/fundo-3.jpg"];
+
+function startGame(){startScreen.classList.add('hidden');policial.style.opacity=1;
+  const bgMusic = document.getElementById("bg-music");
+  if (bgMusic) {
+    bgMusic.volume = 0.1; 
+    bgMusic.play().catch(() => {
+      console.log("⚠️ Música será iniciada após interação do jogador.");
+    });
+  }
+requestAnimationFrame(update);}
+startBtn.addEventListener('click',startGame);
+restartBtn.addEventListener('click',()=>location.reload());
+restartBtn2.addEventListener('click',()=>location.reload());
+
+reviveBtn.addEventListener('click',()=>{
+  if(coins>=5){
+    coins-=5;
+    coinsEl.textContent=`💰 MOEDAS: ${coins}`;
+    gameOver.classList.add('hidden');
+    isGameOver=false;
+
+    // limpar obstáculos próximos
+    obstacles.forEach(o=>o.remove());
+    obstacles=[];
+    coinsArr.forEach(c=>c.remove());
+    coinsArr=[];
+
+    // começa lento e acelera em 5s
+    let startSpeed=2;
+    const targetSpeed=7+(level-1)*SPEED_INCREMENT;
+    gameSpeed=startSpeed;
+    const inc=(targetSpeed-startSpeed)/(5*60);
+    let frames=0;
+    const accel=setInterval(()=>{
+      if(frames<5*60){gameSpeed+=inc;frames++}else{gameSpeed=targetSpeed;clearInterval(accel);}
+    },1000/60);
+  }else{
+    showReward('💸 Moedas insuficientes!');
+  }
+});
+
+window.addEventListener('keydown',e=>{
+  if((e.code==='Space'||e.key==='ArrowUp')&&!isJumping&&!isGameOver){isJumping=true;velocityY=jumpForce;}
+  if(e.code==='ArrowDown'&&isJumping&&!isGameOver){velocityY-=10;}
+});
+
+function spawnObstacle(){
+  const el=document.createElement('div');
+  el.className='obstacle';
+  el.style.left='800px';
+  game.appendChild(el);
+  obstacles.push(el);
+}
+function spawnCoin(){
+  const el=document.createElement('div');
+  el.className='coin';
+  el.style.left=(800+Math.random()*200)+'px';
+  el.style.bottom=60+'px';
+  game.appendChild(el);
+  coinsArr.push(el);
+}
+function showReward(text){
+  const r=document.createElement('div');
+  r.className='reward';
+  r.textContent=text;
+  game.appendChild(r);
+  setTimeout(()=>r.remove(),1600);
+}
+function checkCollisions(){
+  const carRect=car.getBoundingClientRect();
+  for(const o of obstacles){
+    const oRect=o.getBoundingClientRect();
+    if(carRect.right-20>oRect.left+63&&carRect.left+69<oRect.right-10&&carRect.bottom-8>oRect.top+13&&carRect.top+8<oRect.bottom){return true;}
+  }
+  return false;
+}
+function checkCoinCollection(){
+  const carRect=car.getBoundingClientRect();
+  for(let i=coinsArr.length-1;i>=0;i--){ 
+    const c=coinsArr[i]; 
+    const cRect=c.getBoundingClientRect(); 
+    if(carRect.right>cRect.left&&carRect.left<cRect.right&&carRect.bottom>cRect.top&&carRect.top<cRect.bottom){ 
+      coins++;coinsEl.textContent=`💰 MOEDAS: ${coins}`; 
+      showReward('+1 💰');c.remove();coinsArr.splice(i,1);
+  const coinSound = document.getElementById("coin-sound");
+      if (coinSound) {
+        coinSound.currentTime = 0; 
+        coinSound.play().catch(() => {}); 
+      } 
+    }
+  }
+}
+function nextLevel(){
+  level++;
+  if(level>10){victoryScreen.classList.remove('hidden');isGameOver=true;return;}
+  isTransitioning=true;
+  progress=0;
+  distance=500;
+  updateDistanceDisplay();
+
+  car.classList.add('exit');
+  setTimeout(()=>{
+    car.classList.remove('exit');
+    car.style.transform='translateX(0)';
+    gameSpeed=7+(level-1)*SPEED_INCREMENT;
+    scoreEl.textContent=`SCORE: ${score} | NÍVEL: ${level}`;
+    if(level%5===0){
+      bgIndex=(bgIndex+1)%bgList.length;
+      crossfadeBackground(bgIndex);
+    }
+    isTransitioning=false;
+  },500); // 🔥 transição curta sem pausa
+}
+function crossfadeBackground(nextIndex){
+  const nextUrl=bgList[nextIndex%bgList.length];
+  const top=bgA.classList.contains('visible')?bgA:bgB;
+  const bottom=top===bgA?bgB:bgA;
+  bottom.style.backgroundImage=`url('${nextUrl}')`;
+  void bottom.offsetWidth;
+  bottom.classList.add('visible');
+  setTimeout(()=>top.classList.remove('visible'),400);
+}
+function updateDistanceDisplay(){distanceEl.textContent=`📦 DISTÂNCIA: ${Math.max(0,Math.round(distance))}m`;}
+function movePolice(){
+  if(!policeActive)return;
+  const carX=220;
+  const targetX=carX-160;
+  policeX+=(targetX-policeX)*0.03;
+  for(const o of obstacles){
+    const oLeft=parseFloat(o.style.left);
+    if(oLeft>policeX&&oLeft-policeX<150&&!policeJumping){
+      policeJumping=true;
+      policeVelY=jumpForce*0.9;
+    }
+  }
+  if(policeJumping){
+    policeY+=policeVelY;
+    policeVelY+=gravity;
+    if(policeY<=0){policeY=0;policeJumping=false;policeVelY=0;}
+  }
+  policial.style.left=policeX+'px';
+  policial.style.bottom=policeY+'px';
+}
+let obstacleTimer=0;
+function update(){
+  requestAnimationFrame(update);
+  if(isGameOver)return;
+  if(isJumping){carY+=velocityY;velocityY+=gravity;if(carY<=0){carY=0;isJumping=false;velocityY=0;}}
+  car.style.bottom=carY+'px';
+  backgroundX-=gameSpeed*0.5;
+  const visibleBg=bgA.classList.contains('visible')?bgA:bgB;
+  visibleBg.style.backgroundPositionX=backgroundX+'px';
+  if(!isTransitioning){
+    progress+=0.25;
+    const progressPercent=Math.min(progress,500)/500;
+    progressBar.style.width=(progressPercent*100)+'%';
+    distance=500*(1-progressPercent);
+    score=Math.round((1-distance/500)*500);
+    updateDistanceDisplay();
+    scoreEl.textContent=`SCORE: ${score} | NÍVEL: ${level}`;
+    if(distance<=0){distance=0;updateDistanceDisplay();nextLevel();}
+  }
+  obstacleTimer-=gameSpeed;
+  if(obstacleTimer<=0){spawnObstacle();obstacleTimer=500+Math.random()*400;}
+  if(Math.random()<0.005)spawnCoin();
+  for(let i=obstacles.length-1;i>=0;i--){
+    const obs=obstacles[i];
+    const left=parseFloat(obs.style.left);
+    obs.style.left=(left-gameSpeed)+'px';
+    if(left+60<0){obs.remove();obstacles.splice(i,1);}
+  }
+  for(let i=coinsArr.length-1;i>=0;i--){
+    const coin=coinsArr[i];
+    const left=parseFloat(coin.style.left);
+    coin.style.left=(left-gameSpeed)+'px';
+    if(left+40<0){coin.remove();coinsArr.splice(i,1);}
+  }
+  checkCoinCollection();
+  movePolice();
+  if(checkCollisions()){
+    isGameOver=true;
+    gameOver.classList.remove('hidden');
+  }
+  if(level>=1)policeActive=true;
+}
+</script>
+<audio id="bg-music" loop>
+  <source src="sounds/musicfundo.mp3" type="audio/mpeg">
+  <audio id="coin-sound">
+  <source src="sounds/coinSound.mp3" type="audio/mpeg">
+</audio>
+</audio>
+</body>
+</html>

@@ -260,15 +260,39 @@ let isGameOver=false,progress=0,policeActive=false,policeX=60;
 let bgIndex=0,isTransitioning=false;
 const bgList=["img/fundo.avif","img/fundo-2.jpg","img/fundo-3.jpg"];
 
-function startGame(){startScreen.classList.add('hidden');policial.style.opacity=1;
+function startGame() {
+  startScreen.classList.add('hidden');
+  policial.style.opacity = 1;
+
   const bgMusic = document.getElementById("bg-music");
+  const toggleBtn = document.getElementById("toggle-music");
+  let musicMuted = false;
+
+  // Iniciar música
   if (bgMusic) {
-    bgMusic.volume = 0.1; 
+    bgMusic.volume = 0.1;
     bgMusic.play().catch(() => {
       console.log("⚠️ Música será iniciada após interação do jogador.");
     });
   }
-requestAnimationFrame(update);}
+
+  // Controle de mute
+  toggleBtn.addEventListener("click", () => {
+    musicMuted = !musicMuted;
+
+    if (musicMuted) {
+      bgMusic.muted = true;
+      toggleBtn.style.background = "#ff4444";   // vermelho
+      toggleBtn.textContent = "🔇 Música";
+    } else {
+      bgMusic.muted = false;
+      toggleBtn.style.background = "#00ff99";   // verde original
+      toggleBtn.textContent = "🔊 Música";
+    }
+  });
+
+  requestAnimationFrame(update);
+}
 startBtn.addEventListener('click',startGame);
 restartBtn.addEventListener('click',()=>location.reload());
 restartBtn2.addEventListener('click',()=>location.reload());
